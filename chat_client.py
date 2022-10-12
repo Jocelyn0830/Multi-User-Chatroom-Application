@@ -1,3 +1,4 @@
+
 #!/usr/bin/python3
 #
 # COMP 411, Fall 2022
@@ -11,17 +12,15 @@
 import socket
 import sys
 import threading
-import datetime
-import header_constants as const
-import util
+
+HEADER_LENGTH = 10
 
 
 class ChatClient:
 
-    def __init__(self, chat_host, chat_port, username):
+    def __init__(self, chat_host, chat_port):
         self.chat_host = chat_host
         self.chat_port = chat_port
-        self.username = username
         self.start()
 
     def start(self):
@@ -44,25 +43,23 @@ class ChatClient:
     # (Needs to determine when the header terminates and data begins)
     # Then write it to the chat server
     def write_sock(self, sock):
+        username = input('Username: ')
+        bin_username = username.encode('utf-8')
+
         while True:
             # Takes user input
-            str_msg = input("Type your message: ")
-            current_time = datetime.datetime.now()
+            str_msg = input("")
 
-            # Add headers and send to server
-            bin_msg = str_msg.encode('utf-8')
-            length_header = 'Length: ' + str(len(bin_msg)) + const.END_LINE
-            username_header = 'Username: ' + self.username + const.END_LINE
-            date_header = 'Date: ' + str(current_time) + const.END_LINE
-            data = 'Data: ' + str_msg + const.END_LINE
-            msg_to_send = length_header + username_header + \
-                date_header + data + const.END_LINE
+            # Add username to the message
+            msg_with_uname = username + ': ' + str_msg
+            bin_msg = msg_with_uname.encode('utf-8')
 
-            bin_msg_to_send = msg_to_send.encode('utf-8')
-            sock.send(bin_msg_to_send)
-            # Check if the user leaves the chat room
-            if not str_msg:
-                break
+            # Length header: this header has fixed length 19
+            msg_header = f"Msg-Len: {len(bin_msg ):<{HEADER_LENGTH}}".encode(
+                'utf-8')
+            msg_to_send = msg_header + bin_msg
+
+            sock.send(msg_to_send)
 
     # ToDo: continuously read data from the socket with the server,
     # parse the portocol header the server put, determine
@@ -70,22 +67,17 @@ class ChatClient:
     # Then display it to the screen with the format "user:data"
 
     def read_sock(self, sock):
-        bin_msg = b''
         while True:
-            more = sock.recv(4096)
-            bin_msg += more
-            if const.END_MSG.encode('utf-8') in more:
-                break
-        msg_recvd = bin_msg.decode('utf-8')
-        username = util.get_field(msg_recvd, 'Username: ', const.END_LINE)
-        data = util.get_field(msg_recvd, 'Data: ', const.END_MSG)
-        print(username, end=': ')
-        print(data)
+            msg_header = sock.recv(HEADER_LENGTH + 9)
+            msg_len = int(msg_header.decode(
+                'utf-8').strip().replace('Msg-Len: ', ''))
+            bin_data = sock.recv(msg_len)
+            data = bin_data.decode('utf-8')
+            print(data)
 
 
 def main():
     print('<<<<< Welcome to the chat room >>>>>')
-    username = input('Please type your username: ')
     print('Start chatting! Hit return if you want to leave the chat room.')
     print(sys.argv, len(sys.argv))
     chat_host = 'localhost'
@@ -95,7 +87,7 @@ def main():
         chat_host = sys.argv[1]
         chat_port = int(sys.argv[2])
 
-    chat_client = ChatClient(chat_host, chat_port, username)
+    chat_client = ChatClient(chat_host, chat_port)
 
 
 if __name__ == '__main__':

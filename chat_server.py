@@ -10,8 +10,8 @@
 import socket
 import sys
 import threading
-import header_constants as const
-import util
+
+HEADER_LENGTH = 10
 
 
 class ChatProxy():
@@ -58,18 +58,14 @@ class ChatProxy():
     # return the message
     # An empty string indicates the client left
     def read_data(self, conn):
-        bin_msg = b''
-        while True:
-            more = conn.recv(4096)
-            bin_msg += more
-            if const.END_MSG.encode('utf-8') in more:
-                break
-        data = bin_msg
-        # Check if the user sends an empty string
-        if (int(util.get_field(data.decode('utf-8'), "Length: ", const.END_LINE)) == 0):
-            return -1
-        else:
-            return data
+
+        # Recive the message header
+        msg_header = conn.recv(HEADER_LENGTH + 9)
+        msg_len = int(msg_header.decode(
+            'utf-8').strip().replace('Msg-Len: ', ''))
+        data_with_uname = conn.recv(msg_len)
+
+        return msg_header+data_with_uname
 
     # ToDo: loop through all connections and send message to
     # clients except the sending client
@@ -90,19 +86,19 @@ class ChatProxy():
         self.lock.acquire()
         conn.close()
         del self.chat_list[self.chat_id]
-        # Fill this out
-        print("In cleanup")
 
         self.lock.release()
 
-    # Use the read_data function to continuously read data from socket
+    # Use the read_data function to continuously read data from socket in that thread
     # Whenever a complete message read, send using send_data
     def serve_user(self, conn, addr, user):
-        data = self.read_data(conn)
-        if (data == -1):
-            self.cleanup(conn)
-        else:
-            self.send_data(user, data)
+        while True:
+            data = self.read_data(conn)
+            if (data == -1):
+                self.cleanup(conn)
+                break
+            else:
+                self.send_data(user, data)
 
 
 def main():
