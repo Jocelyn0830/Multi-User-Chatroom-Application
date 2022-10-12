@@ -44,22 +44,27 @@ class ChatClient:
     # Then write it to the chat server
     def write_sock(self, sock):
         username = input('Username: ')
-        bin_username = username.encode('utf-8')
 
         while True:
             # Takes user input
             str_msg = input("")
+            try:
+                if str_msg:
+                    # Add username to the message
+                    msg_with_uname = username + ': ' + str_msg
+                    bin_msg = msg_with_uname.encode('utf-8')
 
-            # Add username to the message
-            msg_with_uname = username + ': ' + str_msg
-            bin_msg = msg_with_uname.encode('utf-8')
+                    # Length header: this header has fixed length 19
+                    msg_header = f"Msg-Len: {len(bin_msg ):<{HEADER_LENGTH}}".encode(
+                        'utf-8')
 
-            # Length header: this header has fixed length 19
-            msg_header = f"Msg-Len: {len(bin_msg ):<{HEADER_LENGTH}}".encode(
-                'utf-8')
-            msg_to_send = msg_header + bin_msg
-
-            sock.send(msg_to_send)
+                    msg_to_send = msg_header + bin_msg
+                    sock.send(msg_to_send)
+                else:
+                    sock.close()
+                    break
+            except:
+                print("Unable to send message to server")
 
     # ToDo: continuously read data from the socket with the server,
     # parse the portocol header the server put, determine
@@ -67,13 +72,19 @@ class ChatClient:
     # Then display it to the screen with the format "user:data"
 
     def read_sock(self, sock):
-        while True:
-            msg_header = sock.recv(HEADER_LENGTH + 9)
-            msg_len = int(msg_header.decode(
-                'utf-8').strip().replace('Msg-Len: ', ''))
-            bin_data = sock.recv(msg_len)
-            data = bin_data.decode('utf-8')
-            print(data)
+        try:
+            while True:
+                # Receives the message header
+                msg_header = sock.recv(HEADER_LENGTH + 9)
+                # Parses the message length
+                msg_len = int(msg_header.decode(
+                    'utf-8').strip().replace('Msg-Len: ', ''))
+                # Receives the message
+                bin_data = sock.recv(msg_len)
+                data = bin_data.decode('utf-8')
+                print(data)
+        except:
+            print("Connection closed")
 
 
 def main():

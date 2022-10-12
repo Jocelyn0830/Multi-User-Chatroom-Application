@@ -59,24 +59,37 @@ class ChatProxy():
     # An empty string indicates the client left
     def read_data(self, conn):
 
-        # Recive the message header
-        msg_header = conn.recv(HEADER_LENGTH + 9)
-        msg_len = int(msg_header.decode(
-            'utf-8').strip().replace('Msg-Len: ', ''))
-        data_with_uname = conn.recv(msg_len)
+        try:
+            # Recive the message header
+            msg_header = conn.recv(HEADER_LENGTH + 9)
+            # Checks if there is a message
+            if msg_header:
+                msg_len = int(msg_header.decode(
+                    'utf-8').strip().replace('Msg-Len: ', ''))
+                # Receives the message
+                data_with_uname = conn.recv(msg_len)
 
-        return msg_header+data_with_uname
+                return msg_header+data_with_uname
+            # If there is no message, client left, return -1
+            else:
+                return -1
+        except:
+            print("Unable to read message from the client")
 
     # ToDo: loop through all connections and send message to
     # clients except the sending client
     def send_data(self, user, data):
         self.lock.acquire()
-        # loop through chat_list and skip the sender
-        for chat_id in (self.chat_list).keys():
-            if (chat_id == user):
-                continue
-            (conn, addr) = self.chat_list.get(chat_id)
-            conn.sendall(data)
+        try:
+            # loop through chat_list and skip the sender
+            for chat_id in (self.chat_list).keys():
+                # Skips the user that sends the message
+                if (chat_id == user):
+                    continue
+                (conn, addr) = self.chat_list.get(chat_id)
+                conn.send(data)
+        except:
+            print("Unable to broadcast data")
 
         self.lock.release()
 
@@ -84,8 +97,15 @@ class ChatProxy():
     # from list of available connections
     def cleanup(self, conn):
         self.lock.acquire()
-        conn.close()
-        del self.chat_list[self.chat_id]
+        try:
+            conn.close()
+            for chat_id in (self.chat_list).keys():
+                (this_conn, this_addr) = self.chat_list.get(chat_id)
+                if (this_conn == conn):
+                    del self.chat_list[chat_id]
+                    break
+        except:
+            print("Unable to close connection: ")
 
         self.lock.release()
 
