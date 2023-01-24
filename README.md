@@ -1,4 +1,4 @@
-# ComputerNetwork Final Project
+# Multi-User Chatroom Application
 
 An advanced python chat room application with tkinter GUI.
 
